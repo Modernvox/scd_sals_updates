@@ -1,7 +1,13 @@
 import os
 import sys
 import logging
-from encrypt_keys import get_machine_key
+
+# ─── Try to import get_machine_key if local ────────────────────────────────
+try:
+    from encrypt_keys import get_machine_key
+except ImportError:
+    get_machine_key = None
+    logging.warning("encrypt_keys.py not found — assuming production environment.")
 
 # ─── LOAD .env (optional, but not required) ─────────────────────────────────
 try:
@@ -19,10 +25,8 @@ PRICE_MAP = {
 }
 REVERSE_PRICE_MAP = {v: k for k, v in PRICE_MAP.items()}
 
-# This is exactly what database.py expects for default storage
 DEFAULT_DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA', os.path.expanduser("~")), "SwiftSaleApp")
 
-# Your GUI was also importing PRIMARY_COLOR, so keep it here
 PRIMARY_COLOR = "#378474"
 
 TIER_LIMITS = {
@@ -38,41 +42,24 @@ PAYMENT_LINKS = {
     "Gold":   "https://buy.stripe.com/28E28s3ku2CPdjfe26gw000",
 }
 
-# ─── RESOURCE PATH (FOR BUNDLED EXECUTABLES) ────────────────────────────────
-
 def get_resource_path(relative_path: str) -> str:
-    """
-    When PyInstaller bundles the app, it puts everything under a temp folder (sys._MEIPASS).
-    Otherwise, just use the current working directory.
-    """
     if getattr(sys, 'frozen', False):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
 
-# ─── FILESYSTEM SETUP ────────────────────────────────────────────────────────
-
 def ensure_data_dir() -> str:
-    r"""
-    Make sure DEFAULT_DATA_DIR exists (e.g. %LOCALAPPDATA%\SwiftSaleApp),
-    then return that path.
-    """
     os.makedirs(DEFAULT_DATA_DIR, exist_ok=True)
     return DEFAULT_DATA_DIR
-
-# ─── CONFIG LOADING ─────────────────────────────────────────────────────────
 
 class ConfigError(Exception):
     pass
 
 def load_encrypted_keys() -> dict:
-    """
-    Decrypt all the static secrets (Stripe keys, API tokens, etc.), then
-    fill in USER_EMAIL, PORT, APP_BASE_URL, and DATABASE_URL with defaults
-    or real environment overrides.
-    """
+    if not get_machine_key:
+        raise ConfigError("Local decryption unavailable — missing encrypt_keys.py")
+
     fernet = get_machine_key()
 
-    # 1) Decrypt your static blobs
     encrypted_keys = {
         'STRIPE_PUBLIC_KEY':      'gAAAAABoOhNCjxM8ftO-NNGMzKXH9YKdEjgvuw60IYuIjQLMSzn92Ox2PE3QeG45hzXds7Ojb1s2G_X1bnd3H_6DI0Op4hNcbl6fZ-WaVSJ3UB58kSFtFrl_Ezdx8fqQtnYtOmzD4pofdCFCpMMWr89CleLTrasDr3Y3QdhmEb_SAtdl9shTPdDIFa8ylCwFlI_-hdkaBiidukdF2iE66LU-gAML9INrGQ==',
         'STRIPE_SECRET_KEY':      'gAAAAABoOhNCjh26r-e2Tx8Yt8wRYxQnhTZgGR96HSLE3II8r6PYiR1L0thKc1gBB7pXUF4dKy18lRbPanhS3DEnKeGCuITAI3UunnmTzGc3tUv3Tgs1c3eFU1PWp5Lwwqiuuc_W1W2ln0CG1ahJJ6PAXB6Wq7AZvm2zTxZoSMEgLhyvk08FPx2brdCrD4jJBgusb9BMme8Dqiad73lVGQau_n-fhocAgg==',
@@ -82,6 +69,7 @@ def load_encrypted_keys() -> dict:
         'DEV_OVERRIDE_SECRET':    'gAAAAABoOhNCEVTg8f2pQoA63W_TK8ZhWvDiD0yLGZxOFWHMQoeD8NgfRKCqgjj3wycbBl5KbXuNv4d58iHmdbpPv-skJ1IJfA==',
         'NGROK_AUTH_TOKEN':       'gAAAAABoOhNCvpN3_445IiaB4JKGqHCpoiYY9yXh0PUGyQ8mH3bXf78agyOAsGr6SRVqkmKOxn_yCWS0tBcHyL3UWNwqIGiNklMDGjK9pnjZ4_my-A3KQ516q0YpgM0mhXBkBwkDaE5hv9sWwXN2_CZOuMsLo_hcIQ=='
     }
+
     decrypted = {}
     for k, blob in encrypted_keys.items():
         try:
@@ -90,27 +78,19 @@ def load_encrypted_keys() -> dict:
             logging.error(f"Failed to decrypt {k}: {e}")
             raise ConfigError(f"Failed to decrypt {k}")
 
-    # 2) USER_EMAIL: optional override, default = "" (trial mode)
     decrypted['USER_EMAIL'] = os.getenv("USER_EMAIL", "")
-
-    # 3) PORT & APP_BASE_URL: override via ENV if set, otherwise default to 8000/localhost:8000
     decrypted['PORT'] = os.getenv("PORT", "8000")
-    decrypted['APP_BASE_URL'] = os.getenv(
-        "APP_BASE_URL",
-        f"http://localhost:{decrypted['PORT']}"
-    )
+    decrypted['APP_BASE_URL'] = os.getenv("APP_BASE_URL", f"http://localhost:{decrypted['PORT']}")
 
-    # 4) DATABASE_URL: always point to %LOCALAPPDATA%\SwiftSaleApp\subscriptions.db
-    ensure_data_dir()  # create the folder if it doesn’t exist
+    ensure_data_dir()
     db_file = os.path.join(DEFAULT_DATA_DIR, "subscriptions.db")
     decrypted['DATABASE_URL'] = f"sqlite:///{db_file}"
 
     return decrypted
 
-# ─── EXPORT EVERYTHING at module level ────────────────────────────────────
+# ─── LOAD ENVIRONMENT CONFIG ────────────────────────────────────────────────
 
 if os.environ.get("RENDER", "0") == "1":
-    # Render environment: load from env vars
     STRIPE_PUBLIC_KEY     = os.environ["STRIPE_PUBLIC_KEY"]
     STRIPE_SECRET_KEY     = os.environ["STRIPE_SECRET_KEY"]
     STRIPE_WEBHOOK_SECRET = os.environ["STRIPE_WEBHOOK_SECRET"]
@@ -124,7 +104,6 @@ if os.environ.get("RENDER", "0") == "1":
     APP_BASE_URL          = os.environ.get("APP_BASE_URL", f"http://localhost:{PORT}")
     DATABASE_URL          = "sqlite:///subscriptions.db"
 else:
-    # Local environment: decrypt encrypted blobs
     _keys = load_encrypted_keys()
 
     STRIPE_PUBLIC_KEY     = _keys['STRIPE_PUBLIC_KEY']
@@ -140,14 +119,12 @@ else:
     APP_BASE_URL          = _keys['APP_BASE_URL']
     DATABASE_URL          = _keys['DATABASE_URL']
 
-# For backward compatibility (some modules do load_config())
+# ─── EXPORT LOAD FUNCTION FOR MODULES THAT CALL load_config() ───────────────
 load_config = load_encrypted_keys
 
 if __name__ == "__main__":
-    print("Loaded config keys:", list(_keys.keys()))
     print("PORT:", PORT)
     print("APP_BASE_URL:", APP_BASE_URL)
     print("DATABASE_URL:", DATABASE_URL)
-    print("\n🔐 Decrypted secrets:")
-    for k, v in _keys.items():
-        print(f"{k} = {v}")
+    if not os.environ.get("RENDER"):
+        
