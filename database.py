@@ -18,9 +18,9 @@ class DatabaseManager:
             logging.error("DATABASE_URL is required in production")
             raise ValueError("DATABASE_URL is required in production")
 
-        if not database_url.startswith("sqlite:///"):
-            logging.error(f"Only SQLite is supported: {database_url}")
-            raise ValueError("Only SQLite is supported")
+        if "DATABASE_URL" in os.environ:
+            logging.warning("DATABASE_URL found, but this app uses local SQLite. Ignoring it.")
+            
 
         if not os.path.exists(db_path):
             install_dir = os.path.dirname(os.path.abspath(__file__))
