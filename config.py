@@ -1,16 +1,16 @@
 import os
 import sys
 import logging
+from pathlib import Path
 
-
-# ─── Optional .env loading ───────────────────────────────────────────────
+# Optional .env loading
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     logging.debug("python-dotenv not installed; skipping .env load")
 
-# ─── Constants & Static Maps ─────────────────────────────────────────────
+# Constants & Static Maps
 PRICE_MAP = {
     "Bronze": "price_1RLcP4J7WrcpTNl6a8aHdSgv",
     "Silver": "price_1RLcKcJ7WrcpTNl6jT7sLvmU",
@@ -18,7 +18,7 @@ PRICE_MAP = {
 }
 REVERSE_PRICE_MAP = {v: k for k, v in PRICE_MAP.items()}
 
-DEFAULT_DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA', os.path.expanduser("~")), "SwiftSaleApp")
+DEFAULT_DATA_DIR = Path(os.getenv('LOCALAPPDATA', os.path.expanduser("~"))) / "SwiftSaleApp"
 PRIMARY_COLOR = "#378474"
 
 TIER_LIMITS = {
@@ -46,11 +46,10 @@ def ensure_data_dir() -> str:
 class ConfigError(Exception):
     pass
 
-# ─── Local-only decryption logic ─────────────────────────────────────────
 def load_encrypted_keys() -> dict:
-    # ✅ PRODUCTION GUARDRAIL
-    if IS_PRODUCTION:
-        raise ConfigError("load_encrypted_keys() should never be called in production!")
+    env = os.getenv("ENV", "development")
+    if env != "development":
+        raise ConfigError("load_encrypted_keys() should only be called in development!")
 
     try:
         from encrypt_keys import decrypt_keys, get_machine_key
@@ -58,7 +57,6 @@ def load_encrypted_keys() -> dict:
         raise RuntimeError("encrypt_keys.py missing — cannot run in local dev without it.")
 
     fernet = get_machine_key()
-
     encrypted_keys = {
         'STRIPE_PUBLIC_KEY': '...',
         'STRIPE_SECRET_KEY': '...',
@@ -80,34 +78,34 @@ def load_encrypted_keys() -> dict:
     decrypted['USER_EMAIL'] = os.getenv("USER_EMAIL", "")
     decrypted['PORT'] = os.getenv("PORT", "8000")
     decrypted['APP_BASE_URL'] = os.getenv("APP_BASE_URL", f"http://localhost:{decrypted['PORT']}")
-
     ensure_data_dir()
     db_file = os.path.join(DEFAULT_DATA_DIR, "subscriptions.db")
     decrypted['DATABASE_URL'] = f"sqlite:///{db_file}"
 
     return decrypted
 
-# ─── Final bulletproof loader ────────────────────────────────────────────
 def load_config():
     env = os.getenv("ENV", "development")
     config = {
         "API_TOKEN": os.getenv("API_TOKEN", ""),
         "USER_EMAIL": os.getenv("USER_EMAIL", ""),
         "APP_BASE_URL": os.getenv("APP_BASE_URL", "http://localhost:5000"),
-        "PORT": int(os.getenv("PORT", "5000")),
+        "PORT": os.getenv("PORT", "5000"),
         "DEV_UNLOCK_CODE": os.getenv("DEV_UNLOCK_CODE", ""),
         "TELEGRAM_BOT_TOKEN": os.getenv("TELEGRAM_BOT_TOKEN", ""),
-        "TELEGRAM_CHAT_ID": os.getenv("TELEGRAM_CHAT_ID", "")
+        "TELEGRAM_CHAT_ID": os.getenv("TELEGRAM_CHAT_ID", ""),
+        "DATABASE_URL": os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(DEFAULT_DATA_DIR, 'subscriptions.db')}"),
+        "STRIPE_SECRET_KEY": os.getenv("STRIPE_SECRET_KEY", ""),
+        "STRIPE_WEBHOOK_SECRET": os.getenv("STRIPE_WEBHOOK_SECRET", ""),
+        "SECRET_KEY": os.getenv("SECRET_KEY", os.urandom(24).hex())
     }
     if env == "development":
         try:
-            from encrypt_keys import load_encrypted_keys
             config.update(load_encrypted_keys())
-        except (ImportError, Exception):
-            pass  # Fallback to env vars if decryption fails
+        except (ImportError, ConfigError) as e:
+            logging.warning(f"Failed to load encrypted keys: {e}")
     return config
 
-# ─── CLI test ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     cfg = load_config()
     print("PORT:", cfg.get("PORT"))

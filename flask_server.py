@@ -142,23 +142,31 @@ class FlaskServer:
 if __name__ != "__main__":
     try:
         cfg = load_config()
+        # Validate environment variables in production
+        required_env_vars = ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "API_TOKEN", "SECRET_KEY"]
+        if os.getenv("ENV", "development") != "development":
+            missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+            if missing_vars:
+                logging.error(f"Missing environment variables: {', '.join(missing_vars)}")
+                raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}. Please set them in the environment.")
+        
         db = DatabaseManager()
         stripe_service = StripeService(
-            stripe_secret_key=cfg["STRIPE_SECRET_KEY"],
-            webhook_secret=cfg["STRIPE_WEBHOOK_SECRET"],
+            stripe_secret_key=cfg.get("STRIPE_SECRET_KEY", ""),
+            webhook_secret=cfg.get("STRIPE_WEBHOOK_SECRET", ""),
             db_manager=db,
-            api_token=cfg["API_TOKEN"]
+            api_token=cfg.get("API_TOKEN", "")
         )
         server = FlaskServer(
             port=int(cfg.get("PORT", 5000)),
             stripe_service=stripe_service,
-            api_token=cfg["API_TOKEN"],
+            api_token=cfg.get("API_TOKEN", ""),
             latest_bin_assignment_callback=lambda: None,
-            secret_key=cfg["SECRET_KEY"],
+            secret_key=cfg.get("SECRET_KEY", os.urandom(24).hex()),  # Generate random secret if missing
             log_info=logging.getLogger(__name__).info,
             log_error=logging.getLogger(__name__).error
         )
         app = server.app
     except Exception as e:
-        logging.getLogger(__name__).exception("Failed to initialize FlaskServer")
+        logging.getLogger(__name__).exception(f"Failed to initialize FlaskServer: {e}")
         raise

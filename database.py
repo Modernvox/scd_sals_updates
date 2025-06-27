@@ -13,11 +13,10 @@ class DatabaseManager:
             db_path = os.path.join(user_data_dir, 'subscriptions.db')
 
         config = load_config()
-        try:
-            database_url = config["DATABASE_URL"]
-        except KeyError:
-            logging.error("DATABASE_URL not found in configuration.")
-            raise ValueError("DATABASE_URL is required in config")
+        database_url = config.get("DATABASE_URL", f"sqlite:///{db_path}")
+        if not database_url and os.getenv("ENV", "development") == "production":
+            logging.error("DATABASE_URL is required in production")
+            raise ValueError("DATABASE_URL is required in production")
 
         if not database_url.startswith("sqlite:///"):
             logging.error(f"Only SQLite is supported: {database_url}")

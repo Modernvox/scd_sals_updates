@@ -2188,7 +2188,7 @@ if __name__ == "__main__":
     try:
         config = load_config()  # Line 1328
         # Validate environment variables in production
-        required_env_vars = ["API_TOKEN", "USER_EMAIL", "APP_BASE_URL", "PORT"]
+        required_env_vars = ["API_TOKEN", "USER_EMAIL", "APP_BASE_URL", "PORT", "DATABASE_URL"]
         if os.getenv("ENV", "development") != "development":
             missing_vars = [var for var in required_env_vars if not os.getenv(var)]
             if missing_vars:
