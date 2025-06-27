@@ -3,7 +3,7 @@ import sys
 import logging
 
 # ─── Try to import decrypt_keys if local ────────────────────────────────
-LOCAL_ENV = os.environ.get("RENDER", "") != "true"
+LOCAL_ENV = os.environ.get("RENDER", "0") != "1"
 
 if LOCAL_ENV:
     try:
