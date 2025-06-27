@@ -50,10 +50,10 @@ class ConfigError(Exception):
 
 # ─── Local-only decryption logic ─────────────────────────────────────────
 def load_encrypted_keys() -> dict:
+    # ✅ PRODUCTION GUARDRAIL
     if IS_PRODUCTION:
-        raise ConfigError("get_machine_key() should never be called in production.")
+        raise ConfigError("load_encrypted_keys() should never be called in production!")
 
-    # ✅ FIX: Move import inside function to avoid crashing on Render
     try:
         from encrypt_keys import decrypt_keys, get_machine_key
     except ImportError:
@@ -62,7 +62,7 @@ def load_encrypted_keys() -> dict:
     fernet = get_machine_key()
 
     encrypted_keys = {
-        'STRIPE_PUBLIC_KEY': '...',  # replace with real encrypted values
+        'STRIPE_PUBLIC_KEY': '...',
         'STRIPE_SECRET_KEY': '...',
         'STRIPE_WEBHOOK_SECRET': '...',
         'API_TOKEN': '...',
@@ -89,9 +89,9 @@ def load_encrypted_keys() -> dict:
 
     return decrypted
 
-# ─── Safe dynamic config loader ──────────────────────────────────────────
+# ─── Final bulletproof loader ────────────────────────────────────────────
 def load_config():
-    if IS_PRODUCTION:
+    if os.environ.get("RENDER") == "1":
         return {
             "STRIPE_PUBLIC_KEY": os.environ["STRIPE_PUBLIC_KEY"],
             "STRIPE_SECRET_KEY": os.environ["STRIPE_SECRET_KEY"],
@@ -108,7 +108,7 @@ def load_config():
     else:
         return load_encrypted_keys()
 
-# ─── CLI test/debug ──────────────────────────────────────────────────────
+# ─── CLI test ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     cfg = load_config()
     print("PORT:", cfg.get("PORT"))
