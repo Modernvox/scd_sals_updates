@@ -5,16 +5,6 @@ import logging
 # ─── Detect if running in production (Render) ─────────────────────────────
 IS_PRODUCTION = os.environ.get("RENDER", "0") == "1"
 
-# ─── Load decrypt functions if in local dev ──────────────────────────────
-if not IS_PRODUCTION:
-    try:
-        from encrypt_keys import decrypt_keys, get_machine_key
-    except ImportError:
-        raise RuntimeError("encrypt_keys.py missing — cannot run in local dev without it.")
-else:
-    def get_machine_key():
-        raise RuntimeError("get_machine_key() should never be called in production.")
-
 # ─── Optional .env loading ───────────────────────────────────────────────
 try:
     from dotenv import load_dotenv
@@ -63,10 +53,16 @@ def load_encrypted_keys() -> dict:
     if IS_PRODUCTION:
         raise ConfigError("get_machine_key() should never be called in production.")
 
+    # ✅ FIX: Move import inside function to avoid crashing on Render
+    try:
+        from encrypt_keys import decrypt_keys, get_machine_key
+    except ImportError:
+        raise RuntimeError("encrypt_keys.py missing — cannot run in local dev without it.")
+
     fernet = get_machine_key()
 
     encrypted_keys = {
-        'STRIPE_PUBLIC_KEY': '...',  # replace with real values
+        'STRIPE_PUBLIC_KEY': '...',  # replace with real encrypted values
         'STRIPE_SECRET_KEY': '...',
         'STRIPE_WEBHOOK_SECRET': '...',
         'API_TOKEN': '...',
