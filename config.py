@@ -2,26 +2,27 @@ import os
 import sys
 import logging
 
-# ─── Try to import decrypt_keys if local ────────────────────────────────
-LOCAL_ENV = os.environ.get("RENDER", "0") != "1"
+# ─── Detect if running in production (Render) ───────────────────────────────
+IS_PRODUCTION = os.environ.get("RENDER", "0") == "1"
 
-if LOCAL_ENV:
+# ─── Load decrypt functions if in local dev ────────────────────────────────
+if not IS_PRODUCTION:
     try:
         from encrypt_keys import decrypt_keys, get_machine_key
     except ImportError:
         raise RuntimeError("encrypt_keys.py missing — cannot run in local dev without it.")
 else:
     def get_machine_key():
-        raise RuntimeError("get_machine_key() should not be called in production.")
+        raise RuntimeError("get_machine_key() should never be called in production.")
 
-# ─── LOAD .env (optional) ────────────────────────────────────────────────
+# ─── Optional .env loading ────────────────────────────────────────────────
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     logging.debug("python-dotenv not installed; skipping .env load")
 
-# ─── STATIC MAPS & CONSTANTS ─────────────────────────────────────────────
+# ─── Constants & Static Maps ──────────────────────────────────────────────
 PRICE_MAP = {
     "Bronze": "price_1RLcP4J7WrcpTNl6a8aHdSgv",
     "Silver": "price_1RLcKcJ7WrcpTNl6jT7sLvmU",
@@ -57,15 +58,21 @@ def ensure_data_dir() -> str:
 class ConfigError(Exception):
     pass
 
+# ─── Decrypt keys only in local dev ───────────────────────────────────────
 def load_encrypted_keys() -> dict:
-    if not LOCAL_ENV:
+    if IS_PRODUCTION:
         raise ConfigError("get_machine_key() should never be called in production.")
 
     fernet = get_machine_key()
 
     encrypted_keys = {
-        'STRIPE_PUBLIC_KEY': '...',
-        # [rest of your encrypted blobs]
+        'STRIPE_PUBLIC_KEY': '...',  # replace with real values
+        'STRIPE_SECRET_KEY': '...',
+        'STRIPE_WEBHOOK_SECRET': '...',
+        'API_TOKEN': '...',
+        'SECRET_KEY': '...',
+        'NGROK_AUTH_TOKEN': '...',
+        'DEV_OVERRIDE_SECRET': '...',
     }
 
     decrypted = {}
@@ -86,10 +93,8 @@ def load_encrypted_keys() -> dict:
 
     return decrypted
 
-
-# ─── LOAD ENVIRONMENT CONFIG ────────────────────────────────────────────────
-
-if os.environ.get("RENDER", "0") == "1":
+# ─── Load Final Configuration ─────────────────────────────────────────────
+if IS_PRODUCTION:
     STRIPE_PUBLIC_KEY     = os.environ["STRIPE_PUBLIC_KEY"]
     STRIPE_SECRET_KEY     = os.environ["STRIPE_SECRET_KEY"]
     STRIPE_WEBHOOK_SECRET = os.environ["STRIPE_WEBHOOK_SECRET"]
@@ -97,14 +102,12 @@ if os.environ.get("RENDER", "0") == "1":
     SECRET_KEY            = os.environ["SECRET_KEY"]
     NGROK_AUTH_TOKEN      = os.environ.get("NGROK_AUTH_TOKEN", "")
     DEV_OVERRIDE_SECRET   = os.environ.get("DEV_OVERRIDE_SECRET", "")
-
     USER_EMAIL            = os.environ.get("USER_EMAIL", "")
     PORT                  = os.environ.get("PORT", "8000")
     APP_BASE_URL          = os.environ.get("APP_BASE_URL", f"http://localhost:{PORT}")
     DATABASE_URL          = "sqlite:///subscriptions.db"
 else:
     _keys = load_encrypted_keys()
-
     STRIPE_PUBLIC_KEY     = _keys['STRIPE_PUBLIC_KEY']
     STRIPE_SECRET_KEY     = _keys['STRIPE_SECRET_KEY']
     STRIPE_WEBHOOK_SECRET = _keys['STRIPE_WEBHOOK_SECRET']
@@ -112,13 +115,12 @@ else:
     SECRET_KEY            = _keys['SECRET_KEY']
     NGROK_AUTH_TOKEN      = _keys['NGROK_AUTH_TOKEN']
     DEV_OVERRIDE_SECRET   = _keys['DEV_OVERRIDE_SECRET']
-
     USER_EMAIL            = _keys['USER_EMAIL']
     PORT                  = _keys['PORT']
     APP_BASE_URL          = _keys['APP_BASE_URL']
     DATABASE_URL          = _keys['DATABASE_URL']
 
-# ─── EXPORT LOAD FUNCTION FOR OTHER MODULES ────────────────────────────────
+# ─── Optional export for other modules ───────────────────────────────────
 load_config = load_encrypted_keys
 
 if __name__ == "__main__":
