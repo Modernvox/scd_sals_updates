@@ -3,12 +3,14 @@ import sys
 import logging
 
 # ─── Try to import get_machine_key if local ────────────────────────────────
-try:
-    from encrypt_keys import get_machine_key
-except ImportError:
-    get_machine_key = None
-    logging.warning("encrypt_keys.py not found — assuming production environment.")
+LOCAL_ENV = os.environ.get("RENDER", "") != "true"   
 
+if LOCAL_ENV:    
+    try:
+        from encrypt_keys import decrypt_keys
+    except ImportError:
+        raise RuntimeError("encrypt_keys.py missing — cannot run in local dev without it.")
+   
 # ─── LOAD .env (optional, but not required) ─────────────────────────────────
 try:
     from dotenv import load_dotenv
@@ -55,8 +57,9 @@ class ConfigError(Exception):
     pass
 
 def load_encrypted_keys() -> dict:
-    if not get_machine_key:
-        raise ConfigError("Local decryption unavailable — missing encrypt_keys.py")
+    if not LOCAL_ENV:
+        # Running on Render — pull from environment
+
 
     fernet = get_machine_key()
 
