@@ -126,5 +126,4 @@ if __name__ == "__main__":
     print("PORT:", PORT)
     print("APP_BASE_URL:", APP_BASE_URL)
     print("DATABASE_URL:", DATABASE_URL)
-    if not os.environ.get("RENDER"):
-        
+            
