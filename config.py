@@ -85,25 +85,27 @@ def load_encrypted_keys() -> dict:
     return decrypted
 
 def load_config():
-    env = os.getenv("ENV", "development")
+    env = os.getenv("ENV", "production")  # default to production
     config = {
         "API_TOKEN": os.getenv("API_TOKEN", ""),
         "USER_EMAIL": os.getenv("USER_EMAIL", ""),
         "APP_BASE_URL": os.getenv("APP_BASE_URL", "http://localhost:5000"),
-        "PORT": os.getenv("PORT", "5000"),
+        "PORT": int(os.getenv("PORT", "5000")),
         "DEV_UNLOCK_CODE": os.getenv("DEV_UNLOCK_CODE", ""),
         "TELEGRAM_BOT_TOKEN": os.getenv("TELEGRAM_BOT_TOKEN", ""),
         "TELEGRAM_CHAT_ID": os.getenv("TELEGRAM_CHAT_ID", ""),
-        "DATABASE_URL": os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(DEFAULT_DATA_DIR, 'subscriptions.db')}"),
-        "STRIPE_SECRET_KEY": os.getenv("STRIPE_SECRET_KEY", ""),
-        "STRIPE_WEBHOOK_SECRET": os.getenv("STRIPE_WEBHOOK_SECRET", ""),
-        "SECRET_KEY": os.getenv("SECRET_KEY", os.urandom(24).hex())
+        "DATABASE_URL": os.getenv("DATABASE_URL", "")  # add this to prevent crash
     }
+
+    # Load decrypt_keys only in dev mode
     if env == "development":
         try:
+            from encrypt_keys import load_encrypted_keys
             config.update(load_encrypted_keys())
-        except (ImportError, ConfigError) as e:
-            logging.warning(f"Failed to load encrypted keys: {e}")
+        except (ImportError, Exception) as e:
+            print(f"[config.py] Skipping encrypted keys in dev: {e}")
+            pass
+
     return config
 
 if __name__ == "__main__":

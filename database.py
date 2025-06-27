@@ -22,7 +22,6 @@ class DatabaseManager:
             logging.error(f"Only SQLite is supported: {database_url}")
             raise ValueError("Only SQLite is supported")
 
-        # Use the provided db_path
         if not os.path.exists(db_path):
             install_dir = os.path.dirname(os.path.abspath(__file__))
             src_db = os.path.join(install_dir, 'subscriptions.db')
@@ -172,11 +171,6 @@ class DatabaseManager:
         result = cursor.fetchone()
         return (result[0], result[1], result[2]) if result else (None, None, None)
 
-    def close(self):
-        if self.conn:
-            self.conn.close()
-            logging.info("Database connection closed")
-
     def count_user_bins(self, user_email: str) -> int:
         try:
             cursor = self.conn.cursor()
@@ -189,3 +183,8 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Failed to count bins for {user_email}: {e}", exc_info=True)
             return 0
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
+            logging.info("Database connection closed")
