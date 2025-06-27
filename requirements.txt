@@ -1,3 +1,9 @@
 flask
 gunicorn
 flask-cors
+flask-socketio
+flask-limiter
+stripe
+waitress
+redis
+requests
