@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: scd-whatnot-api
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn app:app
+    plan: free
+
+  - type: cron
+    name: scd-show-scraper
+    env: python
+    schedule: "0 */6 * * *"  # Every 6 hours
+    buildCommand: ""
+    startCommand: python scraper.py
+    plan: free
