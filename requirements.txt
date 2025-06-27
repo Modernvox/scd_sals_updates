@@ -8,3 +8,4 @@ waitress
 redis
 requests
 tenacity
+psycopg2

@@ -12,6 +12,7 @@ from waitress import serve
 from config import PRICE_MAP, REVERSE_PRICE_MAP, TIER_LIMITS, load_config, get_resource_path
 from stripe_service import StripeService
 from database import DatabaseManager
+from cloud_database import CloudDatabaseManager
 import stripe
 import sqlite3
 import zipfile
@@ -150,7 +151,13 @@ if __name__ != "__main__":
                 logging.error(f"Missing environment variables: {', '.join(missing_vars)}")
                 raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}. Please set them in the environment.")
         
-        db = DatabaseManager()
+        cfg = load_config()
+        env = os.getenv("ENV", "development").lower()
+        if env == "production":
+            db = CloudDatabaseManager()
+        else:
+            db = DatabaseManager()
+
         stripe_service = StripeService(
             stripe_secret_key=cfg.get("STRIPE_SECRET_KEY", ""),
             webhook_secret=cfg.get("STRIPE_WEBHOOK_SECRET", ""),
