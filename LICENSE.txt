@@ -1,0 +1,65 @@
+SwiftSale™ Software License Agreement
+Last Updated: May 12, 2025
+
+This Software License Agreement ("Agreement") is a legal contract between you ("User") and Mike St Pierre ("Licensor"), the owner of the SwiftSale™ trademark and intellectual property, for the use of the SwiftSale™ software application ("Software"). By installing, copying, accessing, or otherwise using the Software, you agree to be bound by the terms of this Agreement. If you do not agree to these terms, do not install or use the Software.
+
+1. Definitions
+   - "Software" refers to the SwiftSale™ application, including all modules, source code, binaries, documentation, and associated materials, whether in demo or full mode.
+   - "Demo Mode" refers to the limited-functionality version of the Software provided for evaluation purposes.
+   - "Full Mode" refers to the Software activated with a valid subscription license (e.g., Trial, Bronze, Silver, Gold tiers) via Stripe integration.
+
+2. License Grant
+   Subject to the terms of this Agreement, Licensor grants you a non-exclusive, non-transferable, revocable license to:
+   - Use the Software in Demo Mode for personal or internal business evaluation and testing purposes.
+   - Use the Software in Full Mode for personal or commercial purposes, provided you maintain an active subscription license through the Software’s Stripe integration.
+   The license is limited to the number of bins and features permitted by your subscription tier, as defined in the Software.
+
+3. Restrictions
+   You may not:
+   - Modify, adapt, reverse-engineer, decompile, disassemble, or create derivative works of the Software, except as permitted by applicable law.
+   - Distribute, sublicense, rent, lease, sell, or transfer the Software or any portion thereof to third parties.
+   - Use the Software for commercial purposes in Demo Mode or beyond the limits of your subscription tier in Full Mode without obtaining a separate license from Licensor.
+   - Remove, alter, or obscure any copyright, trademark (including SwiftSale™), or proprietary notices in the Software.
+   - Circumvent or attempt to circumvent any license restrictions, subscription checks, or security measures in the Software.
+   - Use the Software to violate any applicable laws, regulations, or third-party rights.
+
+4. Ownership
+   The Software, including all intellectual property rights, source code, designs, and the SwiftSale™ trademark, is owned by Mike St Pierre. This Agreement does not transfer any ownership rights to you. All rights not expressly granted are reserved by Licensor.
+
+5. Subscription and Fees
+   - Use of the Software in Full Mode requires an active subscription license, managed through the Software’s integration with Stripe.
+   - You are responsible for all subscription fees associated with your chosen tier (e.g., Trial, Bronze, Silver, Gold), as outlined in the Software.
+   - Licensor may update subscription terms or fees, with notice provided through the Software or via contact information provided during subscription.
+
+6. Third-Party Services
+   The Software integrates with third-party services, including Stripe for payments and Telegram for notifications. You are responsible for complying with the terms of service of these third-party providers. Licensor is not liable for any issues arising from your use of third-party services.
+
+7. No Warranty
+   The Software is provided "AS IS" without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement. Licensor does not guarantee that the Software will meet your requirements, operate uninterrupted, or be error-free. Use of the Software in Demo Mode is solely for evaluation, and Licensor makes no guarantees regarding functionality or performance.
+
+8. Limitation of Liability
+   To the maximum extent permitted by law, Mike St Pierre and his affiliates, agents, or representatives shall not be liable for any direct, indirect, incidental, special, consequential, or punitive damages arising from or related to the use or inability to use the Software, including but not limited to loss of data, profits, or business opportunities, even if advised of the possibility of such damages. In no event shall Licensor’s total liability exceed the amount paid by you for the Software subscription, if any.
+
+9. Indemnification
+   You agree to indemnify and hold harmless Mike St Pierre and his affiliates from any claims, damages, or liabilities arising from your use of the Software in violation of this Agreement or applicable laws.
+
+10. Termination
+    This Agreement is effective until terminated. You may terminate it by uninstalling the Software, canceling your subscription (if applicable), and destroying all copies of the Software. Licensor may terminate this Agreement immediately if you breach any of its terms, including failure to maintain an active subscription for Full Mode use. Upon termination, you must cease all use of the Software and delete all copies in your possession.
+
+11. Governing Law
+    This Agreement is governed by the laws of the State of California, United States, without regard to its conflict of law principles. Any disputes arising under this Agreement shall be resolved in the state or federal courts located in Los Angeles County, California.
+
+12. Export Controls
+    You agree to comply with all applicable export control laws and regulations. The Software may not be exported or used in any country or by any individual or entity prohibited by U.S. law.
+
+13. Entire Agreement
+    This Agreement constitutes the entire agreement between you and Licensor regarding the Software and supersedes any prior agreements or understandings. Licensor may amend this Agreement at any time, with notice provided through the Software or via contact information provided during subscription.
+
+14. Contact Information
+    For questions or concerns about this Agreement or the Software, contact Mike St Pierre at:
+    Email: support@swiftsaleapp.com
+    Address: [Insert Physical Address, e.g., 123 SwiftSale Lane, Los Angeles, CA 90001, USA]
+
+By installing, accessing, or using the Software, you acknowledge that you have read, understood, and agree to be bound by the terms of this Agreement.
+
+© 2025 Mike St Pierre. All rights reserved. SwiftSale™ is a trademark of Mike St Pierre.

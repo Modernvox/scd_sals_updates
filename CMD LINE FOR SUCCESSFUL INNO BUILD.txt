@@ -1,0 +1,53 @@
+CMD LINE FOR SUCCESSFUL INNO BUILD TO SWIFTSALEAPP_INSTALL.EXE BUILD:
+C:\Users\lovei\SCD_SALES\swiftsaleapp>"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" SwiftSaleApp.iss
+
+
+CODE:
+
+; SwiftSaleApp.iss
+; Inno Setup script for SwiftSaleApp installer
+
+[Setup]
+AppName=SwiftSaleApp
+AppVersion=3.0
+AppPublisher=YourName
+AppPublisherURL=https://swiftsaleapp.com
+AppSupportURL=https://swiftsaleapp.com
+AppUpdatesURL=https://swiftsaleapp.com
+DefaultDirName={autopf}\SwiftSaleApp
+DefaultGroupName=SwiftSaleApp
+OutputDir=C:\Users\lovei\SCD_SALES\swiftsaleapp\installer
+OutputBaseFilename=SwiftSaleApp_Setup
+Compression=lzma
+SolidCompression=yes
+WizardStyle=modern
+PrivilegesRequired=admin
+; Optional: Add a license file if you have one
+; LicenseFile=C:\Users\lovei\SCD_SALES\swiftsaleapp\LICENSE.txt
+
+[Files]
+; Include the onefile executable and other files from dist\SwiftSaleApp
+Source: "C:\Users\lovei\SCD_SALES\swiftsaleapp\dist\SwiftSaleApp\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+; Include external files from the project root
+Source: "C:\Users\lovei\SCD_SALES\swiftsaleapp\cert.pem"; DestDir: "{app}"
+Source: "C:\Users\lovei\SCD_SALES\swiftsaleapp\key.pem"; DestDir: "{app}"
+Source: "C:\Users\lovei\SCD_SALES\swiftsaleapp\encrypted_keys.json"; DestDir: "{app}"
+Source: "C:\Users\lovei\SCD_SALES\swiftsaleapp\subscriptions.db"; DestDir: "{app}"
+Source: "C:\Users\lovei\SCD_SALES\swiftsaleapp\swiftsale_logo.png"; DestDir: "{app}"
+Source: "C:\Users\lovei\SCD_SALES\swiftsaleapp\templates\*"; DestDir: "{app}\templates"; Flags: recursesubdirs createallsubdirs
+Source: "C:\Users\lovei\SCD_SALES\swiftsaleapp\static\*"; DestDir: "{app}\static"; Flags: recursesubdirs createallsubdirs
+
+[Icons]
+; Desktop shortcut
+Name: "{autodesktop}\SwiftSaleApp"; Filename: "{app}\SwiftSaleApp.exe"; WorkingDir: "{app}"
+; Start Menu shortcuts
+Name: "{group}\SwiftSaleApp"; Filename: "{app}\SwiftSaleApp.exe"; WorkingDir: "{app}"
+Name: "{group}\Uninstall SwiftSaleApp"; Filename: "{uninstallexe}"
+
+[Run]
+; Optional: Launch the app after installation
+Filename: "{app}\SwiftSaleApp.exe"; Description: "{cm:LaunchProgram,SwiftSaleApp}"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+; Clean up logs created during runtime
+Type: files; Name: "{app}\*.log"

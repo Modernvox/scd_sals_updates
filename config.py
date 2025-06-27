@@ -2,24 +2,26 @@ import os
 import sys
 import logging
 
-# ─── Try to import get_machine_key if local ────────────────────────────────
-LOCAL_ENV = os.environ.get("RENDER", "") != "true"   
+# ─── Try to import decrypt_keys if local ────────────────────────────────
+LOCAL_ENV = os.environ.get("RENDER", "") != "true"
 
-if LOCAL_ENV:    
+if LOCAL_ENV:
     try:
-        from encrypt_keys import decrypt_keys
+        from encrypt_keys import decrypt_keys, get_machine_key
     except ImportError:
         raise RuntimeError("encrypt_keys.py missing — cannot run in local dev without it.")
-   
-# ─── LOAD .env (optional, but not required) ─────────────────────────────────
+else:
+    def get_machine_key():
+        raise RuntimeError("get_machine_key() should not be called in production.")
+
+# ─── LOAD .env (optional) ────────────────────────────────────────────────
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     logging.debug("python-dotenv not installed; skipping .env load")
 
-# ─── STATIC MAPS & CONSTANTS ────────────────────────────────────────────────
-
+# ─── STATIC MAPS & CONSTANTS ─────────────────────────────────────────────
 PRICE_MAP = {
     "Bronze": "price_1RLcP4J7WrcpTNl6a8aHdSgv",
     "Silver": "price_1RLcKcJ7WrcpTNl6jT7sLvmU",
@@ -28,7 +30,6 @@ PRICE_MAP = {
 REVERSE_PRICE_MAP = {v: k for k, v in PRICE_MAP.items()}
 
 DEFAULT_DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA', os.path.expanduser("~")), "SwiftSaleApp")
-
 PRIMARY_COLOR = "#378474"
 
 TIER_LIMITS = {
@@ -57,10 +58,6 @@ class ConfigError(Exception):
     pass
 
 def load_encrypted_keys() -> dict:
-    if not LOCAL_ENV:
-        # Running on Render — pull from environment
-
-
     fernet = get_machine_key()
 
     encrypted_keys = {
@@ -122,13 +119,10 @@ else:
     APP_BASE_URL          = _keys['APP_BASE_URL']
     DATABASE_URL          = _keys['DATABASE_URL']
 
-# ─── EXPORT LOAD FUNCTION FOR MODULES THAT CALL load_config() ───────────────
+# ─── EXPORT LOAD FUNCTION FOR OTHER MODULES ────────────────────────────────
 load_config = load_encrypted_keys
 
 if __name__ == "__main__":
     print("PORT:", PORT)
     print("APP_BASE_URL:", APP_BASE_URL)
     print("DATABASE_URL:", DATABASE_URL)
-    if not os.environ.get("RENDER"):
-        cfg["ENV"] = "production"
-        
