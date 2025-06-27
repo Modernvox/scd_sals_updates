@@ -7,3 +7,4 @@ stripe
 waitress
 redis
 requests
+tenacity
