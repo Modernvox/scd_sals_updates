@@ -2,8 +2,6 @@ import os
 import sys
 import logging
 
-# ─── Detect if running in production (Render) ─────────────────────────────
-IS_PRODUCTION = os.environ.get("RENDER", "0") == "1"
 
 # ─── Optional .env loading ───────────────────────────────────────────────
 try:
@@ -91,22 +89,23 @@ def load_encrypted_keys() -> dict:
 
 # ─── Final bulletproof loader ────────────────────────────────────────────
 def load_config():
-    if os.environ.get("RENDER") == "1":
-        return {
-            "STRIPE_PUBLIC_KEY": os.environ["STRIPE_PUBLIC_KEY"],
-            "STRIPE_SECRET_KEY": os.environ["STRIPE_SECRET_KEY"],
-            "STRIPE_WEBHOOK_SECRET": os.environ["STRIPE_WEBHOOK_SECRET"],
-            "API_TOKEN": os.environ["API_TOKEN"],
-            "SECRET_KEY": os.environ["SECRET_KEY"],
-            "NGROK_AUTH_TOKEN": os.environ.get("NGROK_AUTH_TOKEN", ""),
-            "DEV_OVERRIDE_SECRET": os.environ.get("DEV_OVERRIDE_SECRET", ""),
-            "USER_EMAIL": os.environ.get("USER_EMAIL", ""),
-            "PORT": os.environ.get("PORT", "8000"),
-            "APP_BASE_URL": os.environ.get("APP_BASE_URL", f"http://localhost:{os.environ.get('PORT', '8000')}"),
-            "DATABASE_URL": "sqlite:///subscriptions.db"
-        }
-    else:
-        return load_encrypted_keys()
+    env = os.getenv("ENV", "development")
+    config = {
+        "API_TOKEN": os.getenv("API_TOKEN", ""),
+        "USER_EMAIL": os.getenv("USER_EMAIL", ""),
+        "APP_BASE_URL": os.getenv("APP_BASE_URL", "http://localhost:5000"),
+        "PORT": int(os.getenv("PORT", "5000")),
+        "DEV_UNLOCK_CODE": os.getenv("DEV_UNLOCK_CODE", ""),
+        "TELEGRAM_BOT_TOKEN": os.getenv("TELEGRAM_BOT_TOKEN", ""),
+        "TELEGRAM_CHAT_ID": os.getenv("TELEGRAM_CHAT_ID", "")
+    }
+    if env == "development":
+        try:
+            from encrypt_keys import load_encrypted_keys
+            config.update(load_encrypted_keys())
+        except (ImportError, Exception):
+            pass  # Fallback to env vars if decryption fails
+    return config
 
 # ─── CLI test ────────────────────────────────────────────────────────────
 if __name__ == "__main__":

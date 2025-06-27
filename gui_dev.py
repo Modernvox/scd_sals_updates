@@ -245,12 +245,12 @@ class SwiftSaleGUI(tk.Frame):
         
 
         self.stripe_service = stripe_service
-        self.api_token = api_token.strip()
-        self.user_email = user_email
-        self.base_url = base_url
-        self.dev_unlock_code = dev_unlock_code
-        self.telegram_bot_token = telegram_bot_token
-        self.telegram_chat_id = telegram_chat_id
+        self.api_token = config.get("API_TOKEN", "").strip()
+        self.user_email = config.get("USER_EMAIL", "") or self.prompt_login()
+        self.base_url = config.get("APP_BASE_URL", "http://localhost:5000")
+        self.dev_unlock_code = config.get("DEV_UNLOCK_CODE", "")
+        self.telegram_bot_token = config.get("TELEGRAM_BOT_TOKEN", "")
+        self.telegram_chat_id = config.get("TELEGRAM_CHAT_ID", "")
         self.log_info = log_info
         self.log_error = log_error
 
@@ -350,7 +350,7 @@ class SwiftSaleGUI(tk.Frame):
 
         retries = 3
         config = load_config()
-        port = config["PORT"]
+        port = config.get("PORT", 5000)
         while retries > 0:
             try:
                 self.sio.connect(f'http://localhost:{port}', wait_timeout=5)
@@ -2185,18 +2185,36 @@ class SwiftSaleGUI(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    config = load_config()
-    stripe_service = None
-    app = SwiftSaleGUI(
-        root,
-        stripe_service=stripe_service,
-        api_token=config["API_TOKEN"],
-        user_email=config["USER_EMAIL"],
-        base_url=config["APP_BASE_URL"],
-        dev_unlock_code=config.get("DEV_UNLOCK_CODE", ""),
-        telegram_bot_token=config.get("TELEGRAM_BOT_TOKEN", ""),
-        telegram_chat_id=config.get("TELEGRAM_CHAT_ID", ""),
-        log_info=logging.info,
-        log_error=logging.error
-    )
+    try:
+        config = load_config()  # Line 1328
+        # Validate environment variables in production
+        required_env_vars = ["API_TOKEN", "USER_EMAIL", "APP_BASE_URL", "PORT"]
+        if os.getenv("ENV", "development") != "development":
+            missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+            if missing_vars:
+                logging.error(f"Missing environment variables: {', '.join(missing_vars)}")
+                messagebox.showerror(
+                    "Startup Error",
+                    f"Missing environment variables: {', '.join(missing_vars)}. "
+                    "Please set them in the environment."
+                )
+                exit(1)
+        
+        # Initialize app with fallbacks for config keys
+        app = SwiftSaleGUI(
+            root,
+            stripe_service=None,
+            api_token=config.get("API_TOKEN", ""),  # Fallback to empty string
+            user_email=config.get("USER_EMAIL", "") or app.prompt_login(),  # Fallback to prompt_login
+            base_url=config.get("APP_BASE_URL", "http://localhost:5000"),  # Fallback to default URL
+            dev_unlock_code=config.get("DEV_UNLOCK_CODE", ""),
+            telegram_bot_token=config.get("TELEGRAM_BOT_TOKEN", ""),
+            telegram_chat_id=config.get("TELEGRAM_CHAT_ID", ""),
+            log_info=logging.info,
+            log_error=logging.error
+        )
+    except Exception as e:
+        logging.error(f"Failed to load config at startup: {e}", exc_info=True)
+        messagebox.showerror("Startup Error", f"Failed to load configuration: {e}")
+        exit(1)
     root.mainloop()
