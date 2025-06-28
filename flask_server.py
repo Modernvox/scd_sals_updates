@@ -19,7 +19,6 @@ import zipfile
 import io
 import requests
 
-# Force safe async mode
 ASYNC_MODE = "threading"
 
 class FlaskServer:
@@ -116,15 +115,26 @@ class FlaskServer:
 
         @self.app.route('/stripe-webhook', methods=['POST'])
         def stripe_webhook():
-            payload = request.data
-            sig_header = request.headers.get('Stripe-Signature')
-            status_code, response = self.stripe_service.handle_webhook(payload, sig_header)
-            if isinstance(response, dict):
-                return jsonify(response), status_code
-            elif isinstance(response, str):
-                return response, status_code
-            else:
-                return "", status_code
+            try:
+                payload = request.data
+                sig_header = request.headers.get('Stripe-Signature')
+
+                if not payload or not sig_header:
+                    logging.error("Webhook missing payload or signature header")
+                    return jsonify({"error": "Missing signature or payload"}), 400
+
+                status_code, response = self.stripe_service.handle_webhook(payload, sig_header)
+
+                if isinstance(response, dict):
+                    return jsonify(response), status_code
+                elif isinstance(response, str):
+                    return response, status_code
+                else:
+                    return "", status_code
+
+            except Exception as e:
+                logging.error(f"Webhook endpoint error: {e}", exc_info=True)
+                return jsonify({"error": "Webhook endpoint failure"}), 500
 
     def _register_socketio_events(self):
         @self.socketio.on('connect')
@@ -143,20 +153,15 @@ class FlaskServer:
 if __name__ != "__main__":
     try:
         cfg = load_config()
-        # Validate environment variables in production
         required_env_vars = ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "API_TOKEN", "SECRET_KEY"]
         if os.getenv("ENV", "development") != "development":
             missing_vars = [var for var in required_env_vars if not os.getenv(var)]
             if missing_vars:
                 logging.error(f"Missing environment variables: {', '.join(missing_vars)}")
-                raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}. Please set them in the environment.")
-        
-        cfg = load_config()
+                raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}")
+
         env = os.getenv("ENV", "development").lower()
-        if env == "production":
-            db = CloudDatabaseManager()
-        else:
-            db = DatabaseManager()
+        db = CloudDatabaseManager() if env == "production" else DatabaseManager()
 
         stripe_service = StripeService(
             stripe_secret_key=cfg.get("STRIPE_SECRET_KEY", ""),
@@ -164,16 +169,19 @@ if __name__ != "__main__":
             db_manager=db,
             api_token=cfg.get("API_TOKEN", "")
         )
+
         server = FlaskServer(
             port=int(cfg.get("PORT", 5000)),
             stripe_service=stripe_service,
             api_token=cfg.get("API_TOKEN", ""),
             latest_bin_assignment_callback=lambda: None,
-            secret_key=cfg.get("SECRET_KEY", os.urandom(24).hex()),  # Generate random secret if missing
+            secret_key=cfg.get("SECRET_KEY", os.urandom(24).hex()),
             log_info=logging.getLogger(__name__).info,
             log_error=logging.getLogger(__name__).error
         )
+
         app = server.app
+
     except Exception as e:
         logging.getLogger(__name__).exception(f"Failed to initialize FlaskServer: {e}")
         raise
