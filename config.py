@@ -94,17 +94,20 @@ def load_config():
         "DEV_UNLOCK_CODE": os.getenv("DEV_UNLOCK_CODE", ""),
         "TELEGRAM_BOT_TOKEN": os.getenv("TELEGRAM_BOT_TOKEN", ""),
         "TELEGRAM_CHAT_ID": os.getenv("TELEGRAM_CHAT_ID", ""),
-        "DATABASE_URL": os.getenv("DATABASE_URL", "")  # add this to prevent crash
+        "DATABASE_URL": os.getenv("DATABASE_URL", "")
     }
 
-    # Load decrypt_keys only in dev mode
+    # Load encrypted dev keys only in development
     if env == "development":
         try:
             from encrypt_keys import load_encrypted_keys
             config.update(load_encrypted_keys())
         except (ImportError, Exception) as e:
             print(f"[config.py] Skipping encrypted keys in dev: {e}")
-            pass
+
+    # Always use live webhook secret from env if it's set (Render fix)
+    if os.getenv("STRIPE_WEBHOOK_SECRET"):
+        config["STRIPE_WEBHOOK_SECRET"] = os.getenv("STRIPE_WEBHOOK_SECRET")
 
     return config
 
