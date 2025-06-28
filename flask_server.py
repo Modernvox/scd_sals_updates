@@ -116,7 +116,7 @@ class FlaskServer:
         @self.app.route('/stripe-webhook', methods=['POST'])
         def stripe_webhook():
             try:
-                payload = request.data
+                payload = request.get_data(as_text=True) 
                 sig_header = request.headers.get('Stripe-Signature')
 
                 if not payload or not sig_header:
