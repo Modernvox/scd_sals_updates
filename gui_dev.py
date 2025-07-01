@@ -396,6 +396,9 @@ class SwiftSaleGUI(tk.Frame):
         db_connection_string = os.getenv("DEV_CODE_DB_URL") or os.getenv("DATABASE_URL")
         device_id = platform.node().strip().lower()    
 
+        if not db_connection_string or not db_connection_string.startswith("postgres"):
+           db_connection_string = "postgres://swiftsale:6lqf31ksFS1KSfs1PAYdnMEJyvBSkgOe@dpg-d1fgjrndiees73bol7tg-a.virginia-postgres.render.com/swiftsale_db"
+
         # Guard against SQLite string accidentally being used
         if not db_connection_string or not db_connection_string.startswith("postgres"):
             messagebox.showerror("Error", "PostgreSQL connection string is missing or invalid.")
