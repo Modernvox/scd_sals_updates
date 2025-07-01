@@ -346,7 +346,6 @@ class SwiftSaleGUI(tk.Frame):
     def refresh_tier_settings(self):
         self.max_bins = TIER_LIMITS.get(self.tier, 20)
         self.update_bins_used_display()
-        self.check_bin_limit_and_update_ui()
 
     def register_socketio_events(self):
         @self.sio.on('update')
