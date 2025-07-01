@@ -402,7 +402,7 @@ class SwiftSaleGUI(tk.Frame):
             return
 
         try:
-            with psycopg2.connect(DB_CONNECTION_STRING) as conn:
+            with psycopg2.connect(db_connection_string) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
                         SELECT email, expires_at, used, assigned_to, device_id FROM dev_codes
