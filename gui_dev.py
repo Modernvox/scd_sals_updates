@@ -394,7 +394,7 @@ class SwiftSaleGUI(tk.Frame):
         from datetime import datetime, timezone
         from tkinter import messagebox, simpledialog
 
-        db_connection_string = os.getenv("DEV_CODE_DB_URL")
+        db_connection_string = os.getenv("DATABASE_URL")
         device_id = platform.node().strip().lower()    
 
         code = simpledialog.askstring("Developer Mode", "Enter developer code:")
