@@ -410,12 +410,12 @@ class SwiftSaleGUI(tk.Frame):
                     """, (code,))
                     result = cursor.fetchone()
 
-                    if not row:
+                    if not result:
                         self.log_info(f"Dev unlock attempt failed: code '{code}' not found.")
                         messagebox.showwarning("Denied", "Invalid or unrecognized code.")
                         return
 
-                    email, expires_at, used, assigned_to, bound_device = row
+                    email, expires_at, used, assigned_to, bound_device = result
                     now = datetime.now(timezone.utc)
 
                     if used:
