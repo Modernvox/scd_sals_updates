@@ -5,18 +5,22 @@ import logging
 import asyncio
 import threading
 import time
+from datetime import datetime, timezone, timedelta
 import webbrowser
+
 import requests
 import sqlite3
 from PIL import Image, ImageTk
 import socketio
 
-from config import PRIMARY_COLOR, get_resource_path, load_config, DEFAULT_DATA_DIR, TIER_LIMITS, PAYMENT_LINKS
+from config import PRIMARY_COLOR, get_resource_path, load_config, DEFAULT_DATA_DIR, TIER_LIMITS, PAYMENT_LINKS, load_email, save_email, clear_saved_email, ensure_data_dir
 from bidder_manager import BidderManager
 from telegram_service import TelegramService
 from database import DatabaseManager
 from reportlab.lib.units import inch
 from annotate_labels import annotate_whatnot_pdf_with_bins_skip_missing
+from dotenv import load_dotenv
+load_dotenv()
 
 class SwiftSaleGUI(tk.Frame):
     def __init__(
@@ -29,9 +33,11 @@ class SwiftSaleGUI(tk.Frame):
         dev_unlock_code,
         telegram_bot_token,
         telegram_chat_id,
+        dev_access_granted,
         log_info,
         log_error
     ):
+        self.dev_access_granted = dev_access_granted
         logging.debug("Initializing SwiftSaleGUI")
         self.master = master
         self.root = master
@@ -243,14 +249,20 @@ class SwiftSaleGUI(tk.Frame):
         self.master.title("SwiftSale")
         self.master.geometry("1100x650")
         
+        ensure_data_dir()
 
         self.stripe_service = stripe_service
-        self.api_token = config.get("API_TOKEN", "").strip()
-        self.user_email = config.get("USER_EMAIL", "") or self.prompt_login()
-        self.base_url = config.get("APP_BASE_URL", "http://localhost:5000")
-        self.dev_unlock_code = config.get("DEV_UNLOCK_CODE", "")
-        self.telegram_bot_token = config.get("TELEGRAM_BOT_TOKEN", "")
-        self.telegram_chat_id = config.get("TELEGRAM_CHAT_ID", "")
+        self.api_token = api_token.strip()
+        self.user_email = user_email or load_email()
+        if not self.user_email:
+            self.user_email = self.prompt_login()
+            if self.user_email:
+                save_email(self.user_email)
+        self.subscription = None  # or leave it unset until the later logic
+        self.base_url = base_url
+        self.dev_unlock_code = dev_unlock_code
+        self.telegram_bot_token = telegram_bot_token
+        self.telegram_chat_id = telegram_chat_id
         self.log_info = log_info
         self.log_error = log_error
 
@@ -331,6 +343,11 @@ class SwiftSaleGUI(tk.Frame):
         self.root.bind("<Control-Alt-d>", self.enable_dev_mode_prompt)
         self.log_info("SwiftSale GUI initialized")
 
+    def refresh_tier_settings(self):
+        self.max_bins = TIER_LIMITS.get(self.tier, 20)
+        self.update_bins_used_display()
+        self.check_bin_limit_and_update_ui()
+
     def register_socketio_events(self):
         @self.sio.on('update')
         def on_update(data):
@@ -367,18 +384,61 @@ class SwiftSaleGUI(tk.Frame):
                 time.sleep(2)
 
     def enable_dev_mode_prompt(self, event=None):
+        import psycopg2
+        from psycopg2 import sql
+        from datetime import datetime, timezone
+        from tkinter import messagebox, simpledialog
+
         code = simpledialog.askstring("Developer Mode", "Enter developer code:")
-        if code == self.dev_unlock_code:
-            self.tier = "Gold"
-            self.license_key = "DEV_MODE"
-            if hasattr(self, "tier_var"):
-                self.tier_var.set("Gold")
-            self.root.title("SwiftSale – Developer Mode (Gold)")
-            self.log_info("Developer mode enabled via secret code")
+        if not code:
+            return
+
+        db_connection_string = os.getenv("DEV_CODE_DB_URL")
+
+        try:
+            with psycopg2.connect(db_connection_string) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT email, expires_at, used FROM dev_codes
+                        WHERE code = %s
+                    """, (code,))
+                    result = cursor.fetchone()
+
+                    if not result:
+                        self.log_info(f"Dev unlock attempt failed: code '{code}' not found.")
+                        messagebox.showwarning("Denied", "Invalid or unrecognized code.")
+                        return
+
+                    email, expires_at, used = result
+                    now = datetime.now(timezone.utc)
+
+                    if used:
+                        if expires_at and now > expires_at:
+                            self.log_info(f"Dev code '{code}' denied: expired on {expires_at}")
+                            messagebox.showwarning("Denied", "This code has expired.")
+                            return
+
+                        else:
+                            expires_at = now + timedelta(hours=48)
+                            cursor.execute("UPDATE dev_codes SET used = TRUE, expires_at = %s WHERE code = %s", (expires_at, code))
+                            conn.commit()                                       
+
+                    expires_at = now + timedelta(hours=48)
+                    self.tier = "Gold"
+                    self.license_key = "DEV_MODE"
+                    self.refresh_tier_settings()
+
+                    if hasattr(self, "tier_var"):
+                        self.tier_var.set("Gold")
+                    self.root.title("SwiftSale – Developer Mode (Gold)")
+                    self.log_info(f"Dev mode unlocked for {email} using code '{code}'")
+                    messagebox.showinfo("Unlocked", "Gold tier unlocked for this session!")
+
+                    
+        except Exception as e:
+            import traceback
+            self.log_error(f"Database error during code validation: {e}\n{traceback.format_exc()}")
             messagebox.showinfo("Unlocked", "Gold tier unlocked for this session!")
-        else:
-            logging.warning("Invalid developer code attempt")
-            messagebox.showwarning("Denied", "Invalid code.")
 
     def update_header_and_footer(self):
         self.header_label.config(text=f"SwiftSale - {self.user_email} ({self.tier})       |       Build Whatnot Orders in Realtime with the SwiftSale App!")
@@ -387,10 +447,14 @@ class SwiftSaleGUI(tk.Frame):
 
     def prompt_login(self):
         email = simpledialog.askstring("Login", "Enter your email:")
+
         if not email:
-            messagebox.showerror("Error", "Email is required!")
-            raise ValueError("Email not provided")
-        self.log_info(f"User logged in with email: {email}")
+            print("No email provided — starting in Trial mode.")
+            messagebox.showinfo("Trial Mode", "No email entered.\nYou're using the app in Trial mode (20 bins).")
+            return ""  # return blank to fall back on Trial
+            
+        email = email.strip()
+        print(f"User logged in with email: {email}")
         return email
 
     def load_settings(self):
@@ -1741,7 +1805,7 @@ class SwiftSaleGUI(tk.Frame):
                 self.bin_number_label = tk.Label(
                     self.latest_bidder_label.master,
                     text=str(bin_num),
-                    font=("Arial", 20, "bold"),
+                    font=("Arial", 22, "bold"),
                     bg="#FFFFFF",
                     fg="#000000"
                 )
@@ -2184,10 +2248,10 @@ class SwiftSaleGUI(tk.Frame):
 
 
 if __name__ == "__main__":
+    import sys
     root = tk.Tk()
     try:
-        config = load_config()  # Line 1328
-        # Validate environment variables in production
+        config = load_config()
         required_env_vars = ["API_TOKEN", "USER_EMAIL", "APP_BASE_URL", "PORT", "DATABASE_URL"]
         if os.getenv("ENV", "development") != "development":
             missing_vars = [var for var in required_env_vars if not os.getenv(var)]
@@ -2198,23 +2262,24 @@ if __name__ == "__main__":
                     f"Missing environment variables: {', '.join(missing_vars)}. "
                     "Please set them in the environment."
                 )
-                exit(1)
-        
-        # Initialize app with fallbacks for config keys
+                sys.exit(1)  # ← FIXED
+
         app = SwiftSaleGUI(
             root,
             stripe_service=None,
-            api_token=config.get("API_TOKEN", ""),  # Fallback to empty string
-            user_email=config.get("USER_EMAIL", "") or app.prompt_login(),  # Fallback to prompt_login
-            base_url=config.get("APP_BASE_URL", "http://localhost:5000"),  # Fallback to default URL
+            api_token=config.get("API_TOKEN", ""),
+            user_email=config.get("USER_EMAIL", "") or "testuser@example.com",  # avoid recursive app call
+            base_url=config.get("APP_BASE_URL", "http://localhost:5000"),
             dev_unlock_code=config.get("DEV_UNLOCK_CODE", ""),
             telegram_bot_token=config.get("TELEGRAM_BOT_TOKEN", ""),
             telegram_chat_id=config.get("TELEGRAM_CHAT_ID", ""),
+            dev_access_granted=False,  # ← FIXED
             log_info=logging.info,
             log_error=logging.error
         )
     except Exception as e:
         logging.error(f"Failed to load config at startup: {e}", exc_info=True)
         messagebox.showerror("Startup Error", f"Failed to load configuration: {e}")
-        exit(1)
+        sys.exit(1)  # ← FIXED
+
     root.mainloop()

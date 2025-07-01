@@ -1,16 +1,11 @@
 import os
 import sys
 import logging
-from pathlib import Path
 
-# Optional .env loading
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    logging.debug("python-dotenv not installed; skipping .env load")
+# ─── ENVIRONMENT CHECK ─────────────────────────────────────────────
+IS_PROD = os.environ.get("RENDER", "") == "true"
 
-# Constants & Static Maps
+# ─── STATIC MAPS & CONSTANTS ───────────────────────────────────────
 PRICE_MAP = {
     "Bronze": "price_1RLcP4J7WrcpTNl6a8aHdSgv",
     "Silver": "price_1RLcKcJ7WrcpTNl6jT7sLvmU",
@@ -18,8 +13,31 @@ PRICE_MAP = {
 }
 REVERSE_PRICE_MAP = {v: k for k, v in PRICE_MAP.items()}
 
-DEFAULT_DATA_DIR = Path(os.getenv('LOCALAPPDATA', os.path.expanduser("~"))) / "SwiftSaleApp"
+DEFAULT_DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA', os.path.expanduser("~")), "SwiftSaleApp")
 PRIMARY_COLOR = "#378474"
+
+# ─── EMAIL PERSISTENCE ("Remember Me") ────────────────────────────────
+import json
+
+REMEMBER_ME_PATH = os.path.join(DEFAULT_DATA_DIR, "remember_me.json")
+
+def save_email(email: str):
+    os.makedirs(DEFAULT_DATA_DIR, exist_ok=True)
+    with open(REMEMBER_ME_PATH, "w") as f:
+        json.dump({"email": email}, f)
+
+def load_email() -> str:
+    try:
+        with open(REMEMBER_ME_PATH, "r") as f:
+            return json.load(f).get("email", "")
+    except Exception:
+        return ""
+
+def clear_saved_email():
+    try:
+        os.remove(REMEMBER_ME_PATH)
+    except FileNotFoundError:
+        pass
 
 TIER_LIMITS = {
     "Trial":   {"bins": 20},
@@ -43,76 +61,53 @@ def ensure_data_dir() -> str:
     os.makedirs(DEFAULT_DATA_DIR, exist_ok=True)
     return DEFAULT_DATA_DIR
 
-class ConfigError(Exception):
-    pass
+# ─── HARDCODED CONFIG (Dev/Offline Only) ────────────────────────────
 
-def load_encrypted_keys() -> dict:
-    env = os.getenv("ENV", "development")
-    if env != "development":
-        raise ConfigError("load_encrypted_keys() should only be called in development!")
+def load_config() -> dict:
+    if IS_PROD:
+        # Load from Render environment
+        return {
+            'STRIPE_PUBLIC_KEY':     os.environ["STRIPE_PUBLIC_KEY"],
+            'STRIPE_SECRET_KEY':     os.environ["STRIPE_SECRET_KEY"],
+            'STRIPE_WEBHOOK_SECRET': os.environ["STRIPE_WEBHOOK_SECRET"],
+            'API_TOKEN':             os.environ["API_TOKEN"],
+            'SECRET_KEY':            os.environ["SECRET_KEY"],
+            'NGROK_AUTH_TOKEN':      os.environ.get("NGROK_AUTH_TOKEN", ""),
+            'DEV_OVERRIDE_SECRET':   os.environ.get("DEV_OVERRIDE_SECRET", ""),
+            'USER_EMAIL':            os.environ.get("USER_EMAIL", ""),
+            'PORT':                  os.environ.get("PORT", "8000"),
+            'APP_BASE_URL':          os.environ.get("APP_BASE_URL", f"http://localhost:{os.environ.get('PORT', '8000')}"),
+            'DATABASE_URL':          "sqlite:///subscriptions.db"
+        }
+    else:
+        ensure_data_dir()
+        db_file = os.path.join(DEFAULT_DATA_DIR, "subscriptions.db")
 
-    try:
-        from encrypt_keys import decrypt_keys, get_machine_key
-    except ImportError:
-        raise RuntimeError("encrypt_keys.py missing — cannot run in local dev without it.")
+        return {
+            'STRIPE_PUBLIC_KEY':     "gAAAAABoOhNCjxM8ftO-NNGMzKXH9YKdEjgvuw60IYuIjQLMSzn92Ox2PE3QeG45hzXds7Ojb1s2G_X1bnd3H_6DI0Op4hNcbl6fZ-WaVSJ3UB58kSFtFrl_Ezdx8fqQtnYtOmzD4pofdCFCpMMWr89CleLTrasDr3Y3QdhmEb_SAtdl9shTPdDIFa8ylCwFlI_-hdkaBiidukdF2iE66LU-gAML9INrGQ==",
+            'STRIPE_SECRET_KEY':     "gAAAAABoOhNCjh26r-e2Tx8Yt8wRYxQnhTZgGR96HSLE3II8r6PYiR1L0thKc1gBB7pXUF4dKy18lRbPanhS3DEnKeGCuITAI3UunnmTzGc3tUv3Tgs1c3eFU1PWp5Lwwqiuuc_W1W2ln0CG1ahJJ6PAXB6Wq7AZvm2zTxZoSMEgLhyvk08FPx2brdCrD4jJBgusb9BMme8Dqiad73lVGQau_n-fhocAgg==",
+            'STRIPE_WEBHOOK_SECRET': "gAAAAABoOhNCbgXHPZQxYeHLz4_8CXrn64_IWqUjNaXS1bHWjFQ_ZOeRAae2dfZdextwyqZdq7G3bPCcoOXYJ6HPYEXHDwGgIxDPL0GZewGZe1p8jFFMkOdZJDHY1nNqsg3I35M3t9rL",
+            'API_TOKEN':             "gAAAAABoOhNCg3LOv7ddQZ16Ye-1B_Pn-EtIWnQ7FhgP31BfNsclRfvARWazBrOLeu-mnPTaFDAV6U2-vBEQZxvk_hTGvd8lF-nDnKnk_-v6HU5oCfTt5TzjnX_jhxf6wixvWFH_cMAs",
+            'SECRET_KEY':            "gAAAAABoOhNCnSEfaC4ucB0svrt7BSZVQWtlLONsfArLdwIfWM7irQmb4VhKXWODnmEiiqePuh8AUWlwuNgsc7lpx1YzfG0MqENsRIASY3aMoVfG3B1_Sr8oCpS2k5YAlj1wis5yuzPx",
+            'NGROK_AUTH_TOKEN':      "gAAAAABoOhNCvpN3_445IiaB4JKGqHCpoiYY9yXh0PUGyQ8mH3bXf78agyOAsGr6SRVqkmKOxn_yCWS0tBcHyL3UWNwqIGiNklMDGjK9pnjZ4_my-A3KQ516q0YpgM0mhXBkBwkDaE5hv9sWwXN2_CZOuMsLo_hcIQ==",
+            'DEV_OVERRIDE_SECRET':   "gAAAAABoOhNCEVTg8f2pQoA63W_TK8ZhWvDiD0yLGZxOFWHMQoeD8NgfRKCqgjj3wycbBl5KbXuNv4d58iHmdbpPv-skJ1IJfA==",
+            'USER_EMAIL':            os.getenv("USER_EMAIL", ""),
+            'PORT':                  os.getenv("PORT", "8000"),
+            'APP_BASE_URL':          os.getenv("APP_BASE_URL", f"http://localhost:{os.getenv('PORT', '8000')}"),
+            'DATABASE_URL':          f"sqlite:///{db_file}"
+        }
 
-    fernet = get_machine_key()
-    encrypted_keys = {
-        'STRIPE_PUBLIC_KEY': '...',
-        'STRIPE_SECRET_KEY': '...',
-        'STRIPE_WEBHOOK_SECRET': '...',
-        'API_TOKEN': '...',
-        'SECRET_KEY': '...',
-        'NGROK_AUTH_TOKEN': '...',
-        'DEV_OVERRIDE_SECRET': '...',
-    }
+# ─── EXPORT ENVIRONMENT VARIABLES ───────────────────────────────────────
+config = load_config()
 
-    decrypted = {}
-    for k, blob in encrypted_keys.items():
-        try:
-            decrypted[k] = fernet.decrypt(blob.encode()).decode()
-        except Exception as e:
-            logging.error(f"Failed to decrypt {k}: {e}")
-            raise ConfigError(f"Failed to decrypt {k}")
-
-    decrypted['USER_EMAIL'] = os.getenv("USER_EMAIL", "")
-    decrypted['PORT'] = os.getenv("PORT", "8000")
-    decrypted['APP_BASE_URL'] = os.getenv("APP_BASE_URL", f"http://localhost:{decrypted['PORT']}")
-    ensure_data_dir()
-    db_file = os.path.join(DEFAULT_DATA_DIR, "subscriptions.db")
-    decrypted['DATABASE_URL'] = f"sqlite:///{db_file}"
-
-    return decrypted
-
-def load_config():
-    env = os.getenv("ENV", "production")  # default to production
-    config = {
-        "API_TOKEN": os.getenv("API_TOKEN", ""),
-        "USER_EMAIL": os.getenv("USER_EMAIL", ""),
-        "APP_BASE_URL": os.getenv("APP_BASE_URL", "http://localhost:5000"),
-        "PORT": int(os.getenv("PORT", "5000")),
-        "DEV_UNLOCK_CODE": os.getenv("DEV_UNLOCK_CODE", ""),
-        "TELEGRAM_BOT_TOKEN": os.getenv("TELEGRAM_BOT_TOKEN", ""),
-        "TELEGRAM_CHAT_ID": os.getenv("TELEGRAM_CHAT_ID", ""),
-        "DATABASE_URL": os.getenv("DATABASE_URL", "")
-    }
-
-    # Load encrypted dev keys only in development
-    if env == "development":
-        try:
-            from encrypt_keys import load_encrypted_keys
-            config.update(load_encrypted_keys())
-        except (ImportError, Exception) as e:
-            print(f"[config.py] Skipping encrypted keys in dev: {e}")
-
-    # Always use live webhook secret from env if it's set (Render fix)
-    if os.getenv("STRIPE_WEBHOOK_SECRET"):
-        config["STRIPE_WEBHOOK_SECRET"] = os.getenv("STRIPE_WEBHOOK_SECRET")
-
-    return config
-
-if __name__ == "__main__":
-    cfg = load_config()
-    print("PORT:", cfg.get("PORT"))
-    print("APP_BASE_URL:", cfg.get("APP_BASE_URL"))
-    print("DATABASE_URL:", cfg.get("DATABASE_URL"))
+STRIPE_PUBLIC_KEY     = config['STRIPE_PUBLIC_KEY']
+STRIPE_SECRET_KEY     = config['STRIPE_SECRET_KEY']
+STRIPE_WEBHOOK_SECRET = config['STRIPE_WEBHOOK_SECRET']
+API_TOKEN             = config['API_TOKEN']
+SECRET_KEY            = config['SECRET_KEY']
+NGROK_AUTH_TOKEN      = config['NGROK_AUTH_TOKEN']
+DEV_OVERRIDE_SECRET   = config['DEV_OVERRIDE_SECRET']
+USER_EMAIL            = config['USER_EMAIL']
+PORT                  = config['PORT']
+APP_BASE_URL          = config['APP_BASE_URL']
+DATABASE_URL          = config['DATABASE_URL']
