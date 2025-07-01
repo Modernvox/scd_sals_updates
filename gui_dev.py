@@ -394,7 +394,7 @@ class SwiftSaleGUI(tk.Frame):
         from datetime import datetime, timezone
         from tkinter import messagebox, simpledialog
 
-        db_connection_string = os.getenv("DATABASE_URL")
+        db_connection_string = os.getenv("DEV_CODE_DB_URL") or os.getenv("DATABASE_URL")
         device_id = platform.node().strip().lower()    
 
         code = simpledialog.askstring("Developer Mode", "Enter developer code:")
@@ -410,12 +410,12 @@ class SwiftSaleGUI(tk.Frame):
                     """, (code,))
                     result = cursor.fetchone()
 
-                    if not result:
+                    if not row:
                         self.log_info(f"Dev unlock attempt failed: code '{code}' not found.")
                         messagebox.showwarning("Denied", "Invalid or unrecognized code.")
                         return
 
-                    email, expires_at, used, assigned_to, bound_device = result
+                    email, expires_at, used, assigned_to, bound_device = row
                     now = datetime.now(timezone.utc)
 
                     if used:
@@ -447,7 +447,7 @@ class SwiftSaleGUI(tk.Frame):
         except Exception as e:
             import traceback
             self.log_error(f"Database error during code validation: {e}\n{traceback.format_exc()}")
-            messagebox.showerror("Error", "Database connection failed.")
+            messagebox.showerror("Validation Error", str(e))
 
     def update_header_and_footer(self):
         self.header_label.config(text=f"SwiftSale - {self.user_email} ({self.tier})       |       Build Whatnot Orders in Realtime with the SwiftSale App!")
