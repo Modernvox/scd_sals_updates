@@ -396,6 +396,11 @@ class SwiftSaleGUI(tk.Frame):
         db_connection_string = os.getenv("DEV_CODE_DB_URL") or os.getenv("DATABASE_URL")
         device_id = platform.node().strip().lower()    
 
+        # Guard against SQLite string accidentally being used
+        if not db_connection_string or not db_connection_string.startswith("postgres"):
+            messagebox.showerror("Error", "PostgreSQL connection string is missing or invalid.")
+            return
+
         code = simpledialog.askstring("Developer Mode", "Enter developer code:")
         if not code:
             return
