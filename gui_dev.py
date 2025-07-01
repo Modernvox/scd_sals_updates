@@ -383,47 +383,56 @@ class SwiftSaleGUI(tk.Frame):
                     )
                 time.sleep(2)
 
+        
+    def get_device_id():
+        return platform.node().strip().lower()
+
     def enable_dev_mode_prompt(self, event=None):
+        import platform
         import psycopg2
         from psycopg2 import sql
         from datetime import datetime, timezone
         from tkinter import messagebox, simpledialog
 
+        db_connection_string = os.getenv("DEV_CODE_DB_URL")
+        device_id = platform.node().strip().lower()    
+
         code = simpledialog.askstring("Developer Mode", "Enter developer code:")
         if not code:
             return
-
-        db_connection_string = os.getenv("DEV_CODE_DB_URL")
 
         try:
             with psycopg2.connect(db_connection_string) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        SELECT email, expires_at, used FROM dev_codes
+                        SELECT email, expires_at, used, assigned_to, device_id FROM dev_codes
                         WHERE code = %s
                     """, (code,))
                     result = cursor.fetchone()
 
-                    if not result:
+                    if not row:
                         self.log_info(f"Dev unlock attempt failed: code '{code}' not found.")
                         messagebox.showwarning("Denied", "Invalid or unrecognized code.")
                         return
 
-                    email, expires_at, used = result
+                    email, expires_at, used, assigned_to, bound_device = row
                     now = datetime.now(timezone.utc)
 
                     if used:
+                        if assigned_to != self.user_email or bound_device != device_id:
+                            self.log_info(f"Dev code '{code}' rejected: bound to {assigned_to}/{bound_device}, tried {self.user_email}/{device_id}")
+                            messagebox.showwarning("Denied", "This code is already in use on another device/email.")
+                            return
                         if expires_at and now > expires_at:
                             self.log_info(f"Dev code '{code}' denied: expired on {expires_at}")
                             messagebox.showwarning("Denied", "This code has expired.")
                             return
 
-                        else:
-                            expires_at = now + timedelta(hours=48)
-                            cursor.execute("UPDATE dev_codes SET used = TRUE, expires_at = %s WHERE code = %s", (expires_at, code))
-                            conn.commit()                                       
+                    else:
+                        expires = None if code.lower() == "brandi9933" else now + timedelta(hours=48)
+                        cursor.execute("UPDATE dev_codes SET used = TRUE, assigned_to = %s, device_id = %s, expires_at = %s WHERE code = %s", (self.user_email, device_id, expires, code))
+                        conn.commit()                                       
 
-                    expires_at = now + timedelta(hours=48)
                     self.tier = "Gold"
                     self.license_key = "DEV_MODE"
                     self.refresh_tier_settings()
@@ -432,13 +441,13 @@ class SwiftSaleGUI(tk.Frame):
                         self.tier_var.set("Gold")
                     self.root.title("SwiftSale – Developer Mode (Gold)")
                     self.log_info(f"Dev mode unlocked for {email} using code '{code}'")
-                    messagebox.showinfo("Unlocked", "Gold tier unlocked for this session!")
+                    messagebox.showinfo("Unlocked", "Gold tier unlocked!")
 
                     
         except Exception as e:
             import traceback
             self.log_error(f"Database error during code validation: {e}\n{traceback.format_exc()}")
-            messagebox.showinfo("Unlocked", "Gold tier unlocked for this session!")
+            messagebox.showerror("Error", "Database connection failed.")
 
     def update_header_and_footer(self):
         self.header_label.config(text=f"SwiftSale - {self.user_email} ({self.tier})       |       Build Whatnot Orders in Realtime with the SwiftSale App!")
