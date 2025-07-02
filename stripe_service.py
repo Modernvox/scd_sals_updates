@@ -18,47 +18,42 @@ class StripeService:
         Create a Stripe Checkout link only when the user explicitly provides an email.
         Until then, they remain on “free trial” and this method should not be called.
         """
-        # If no email is provided, treat as free‐trial and do not create any Stripe session.
         if not user_email:
             logging.info("User on free trial (no email), skipping checkout creation.")
             return {"error": "No email provided—user is still on free trial."}, 400
 
-        # Validate email format
         if "@" not in user_email:
             logging.error(f"Invalid email: {user_email}")
             return {"error": "Invalid email address."}, 400
 
-        # Ensure tier is valid
         if tier not in TIER_LIMITS:
             logging.error(f"Unknown tier requested: '{tier}'")
             return {"error": f"Invalid tier '{tier}'."}, 400
 
         try:
-            # Check how many bins the user has already (from your DB). If they haven’t upgraded,
-            # count_user_bins(...) should return 0 or whatever the free‐trial count is.
             current_count = self.db_manager.count_user_bins(user_email)
             max_bins = TIER_LIMITS[tier]["bins"]
             if current_count >= max_bins:
-                logging.info(
-                    f"User {user_email} has {current_count} bins; max for {tier} is {max_bins}."
-                )
-                return {
-                    "error": f"Bin limit reached for tier '{tier}' ({max_bins} bins)."
-                }, 400
+                logging.info(f"User {user_email} has {current_count} bins; max for {tier} is {max_bins}.")
+                return {"error": f"Bin limit reached for tier '{tier}' ({max_bins} bins)."}, 400
 
-            # Since you’re using static test payment links:
-            payment_links = {
-                'Bronze': 'https://buy.stripe.com/test_28E28s3ku2CPdjfe26gw000',
-                'Silver': 'https://buy.stripe.com/test_aFa14o2gqcdpenj9LQgw001',
-                'Gold':   'https://buy.stripe.com/test_14AdRa5sCa5h92ZcY2gw002'
-            }
+            price_id = PRICE_MAP.get(tier)
+            if not price_id:
+                logging.error(f"No price ID configured for tier: {tier}")
+                return {"error": f"No price found for tier '{tier}'"}, 400
 
-            if tier not in payment_links:
-                logging.error(f"Tier '{tier}' does not have a payment link")
-                return {"error": f"No payment link for tier '{tier}'."}, 400
+            session = stripe.checkout.Session.create(
+                success_url=request_url_root + 'success',
+                cancel_url=request_url_root + 'cancel',
+                payment_method_types=["card"],
+                mode="subscription",
+                customer_email=user_email,
+                line_items=[{"price": price_id, "quantity": 1}],
+                metadata={"user_email": user_email},
+            )
 
-            logging.info(f"Returning payment link for {tier}: {payment_links[tier]}")
-            return {"url": payment_links[tier]}, 200
+            logging.info(f"Created Stripe Checkout Session for {user_email}, Tier: {tier}")
+            return {"url": session.url}, 200
 
         except Exception as e:
             logging.error(f"Failed to create checkout session: {e}", exc_info=True)
